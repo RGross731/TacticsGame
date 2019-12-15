@@ -1,79 +1,119 @@
-﻿using UnityEngine;
+﻿using System.Collections.Generic;
 using System.Linq;
-using System;
-using System.Collections.Generic;
+using UnityEngine;
 
-[Serializable]
+[System.Serializable]
 public class NavGrid : MonoBehaviour
 {
-    [HideInInspector]
-    public NavTile navTilePrefab;
+    private const float voxelSize = 1f;
+    private const float halfVoxelSize = 0.5f;
+    private const float voxelSkinWidth = 0.1f;
+    private const float stepHeight = 0.2f;
+    private const float maxWalkableAngle = 30f;
+    private readonly string[] ignoreLayers = { "Agent" };
 
+    
     [SerializeField]
     [HideInInspector]
-    private readonly AStarPathfinder pathfinder = new AStarPathfinder();
-
+    private AStarPathfinder pathfinder = new AStarPathfinder();
 
     public List<NavTile> FindPath(NavTile start, NavTile goal)
     {
         return pathfinder.FindPath(start, goal);
     }
 
-    public void Build(Vector3 corner1, Vector3 corner2)
+    public void Bake()
     {
-        //Create new nav tiles
-        Vector2 zRange = corner1.z < corner2.z ? new Vector2(corner1.z, corner2.z) : new Vector2(corner2.z, corner1.z);
-        Vector2 xRange = corner1.x < corner2.x ? new Vector2(corner1.x, corner2.x) : new Vector2(corner2.x, corner1.x);
-        float y = corner1.y;
-
-        for (int z = Mathf.RoundToInt(zRange.x); z < Mathf.RoundToInt(zRange.y); z++)
+        Clear();
+        
+        //Calcuate environment extents
+        Vector3 min = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
+        Vector3 max = new Vector3(float.MinValue, float.MinValue, float.MinValue);
+        foreach (Collider c in FindObjectsOfType<Collider>())
         {
-            for (int x = Mathf.RoundToInt(xRange.x); x < Mathf.RoundToInt(xRange.y); x++)
+            min = Vector3.Min(min, c.bounds.min);
+            max = Vector3.Max(max, c.bounds.max);
+        }
+
+        //Generate nav tiles
+        for (int y = Mathf.RoundToInt(min.y); y < Mathf.RoundToInt(max.y) + voxelSize; y++)
+        {
+            for (int z = Mathf.RoundToInt(min.z); z < Mathf.RoundToInt(max.z); z++)
             {
-                if (Physics.OverlapBox(new Vector3(x + 0.5f, y + 0.5f, z + 0.5f), new Vector3(0.45f, 0.45f, 0.45f), Quaternion.identity, ~LayerMask.GetMask("Agent")).Length == 0)
+                for (int x = Mathf.RoundToInt(min.x); x < Mathf.RoundToInt(max.x); x++)
                 {
-                    Instantiate(navTilePrefab, new Vector3(x + 0.5f, y, z + 0.5f), Quaternion.identity, transform);
+                    if (EmptyVoxel(new Vector3(x, y, z)) && VoxelGrounded(new Vector3(x, y, z)))
+                    {
+                        GameObject navTile = new GameObject("NavTile", typeof(NavTile));
+                        navTile.transform.SetParent(transform);
+                        navTile.transform.position = new Vector3(x + halfVoxelSize, y, z + halfVoxelSize);
+                        navTile.layer = LayerMask.NameToLayer("NavGrid");
+                        navTile.hideFlags = HideFlags.HideInHierarchy;
+
+                        BoxCollider c = navTile.GetComponent<BoxCollider>();
+                        c.isTrigger = true;
+                        c.center = Vector3.zero;
+                        c.size = new Vector3(voxelSize, 0, voxelSize);
+                    }
                 }
             }
         }
 
-        //Assign edge information for nav tiles
+        //Create graph
         foreach (NavTile t in GetComponentsInChildren<NavTile>())
         {
-            t.name = "NavTile";
-
-            BoxCollider c = t.GetComponent<BoxCollider>();
-            c.isTrigger = true;
-            c.center = Vector3.zero;
-            c.size = new Vector3(1, 0, 1);
-            t.gameObject.hideFlags = HideFlags.HideInHierarchy;
-
-
-            t.Edges = Physics.OverlapBox(t.transform.position, new Vector3(1f, 0.2f, 1f), Quaternion.identity, LayerMask.GetMask("NavGrid"))
-                .Select(col => col.GetComponent<NavTile>()).Where(n => n != null && n != t)
-                .Select(n => new NavTile.Edge(n, Mathf.Round(Vector3.Distance(t.transform.position, n.transform.position) * 2) / 2)).ToList();
-        }
-
-        //Remove diagonal connections if adjacent connections aren't both existant
-        foreach (NavTile t in GetComponentsInChildren<NavTile>())
-        {
-            foreach (NavTile.Edge diagonalEdge in t.Edges.Where(n => n.weight == 1.5f).ToList())
+            t.Edges = new List<NavTile.Edge>();
+            foreach (Collider c in Physics.OverlapBox(t.transform.position, new Vector3(voxelSize, stepHeight, voxelSize), Quaternion.identity, LayerMask.GetMask("NavGrid")))
             {
-                if (diagonalEdge.tile.Edges.Select(n => n.tile).Intersect(t.Edges.Select(n => n.tile)).ToList().Count != 2)
+                Vector3 o = t.transform.position + Vector3.up * halfVoxelSize;
+                Vector3 d = c.transform.position - t.transform.position;
+                if (c.GetComponent<NavTile>() != t && EmptyVoxelSweep(o, d))
                 {
-                    t.Edges.Remove(diagonalEdge);
-                }
-            }
+                    t.Edges.Add(new NavTile.Edge(c.GetComponent<NavTile>(), Mathf.Round(Vector3.Distance(t.transform.position, c.transform.position) * 2) / 2));
+                }                
+            } 
         }
     }
 
     public void Clear()
     {
-        //Destroy old nav tiles
         foreach (NavTile t in GetComponentsInChildren<NavTile>())
         {
             DestroyImmediate(t.gameObject);
         }
     }
 
+    private bool EmptyVoxel(Vector3 o)
+    {
+        return Physics.OverlapBox( 
+            new Vector3(o.x + halfVoxelSize, o.y + halfVoxelSize, o.z + halfVoxelSize),
+            new Vector3(halfVoxelSize - voxelSkinWidth, halfVoxelSize - voxelSkinWidth, halfVoxelSize - voxelSkinWidth),
+            Quaternion.identity, 
+            ~LayerMask.GetMask(ignoreLayers)
+        )
+        .Length == 0;
+    }
+
+    private bool VoxelGrounded(Vector3 o)
+    {
+        return Physics.Raycast(    
+            new Vector3(o.x + halfVoxelSize, o.y + halfVoxelSize, o.z + halfVoxelSize),
+            Vector3.down, 
+            out RaycastHit hitInfo, 
+            voxelSize, 
+            ~LayerMask.GetMask(ignoreLayers)
+        ) 
+        && Vector3.Angle(Vector3.up, hitInfo.normal) < maxWalkableAngle;
+    }
+
+    private bool EmptyVoxelSweep(Vector3 o, Vector3 d)
+    {
+        return !Physics.BoxCast(
+            o,
+            new Vector3(halfVoxelSize - voxelSkinWidth, halfVoxelSize - voxelSkinWidth, halfVoxelSize - voxelSkinWidth),
+            d,
+            Quaternion.identity,
+            d.magnitude,
+            ~LayerMask.GetMask(ignoreLayers));
+    }
 }
