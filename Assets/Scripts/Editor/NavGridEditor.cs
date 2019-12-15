@@ -1,5 +1,4 @@
-﻿using System.Linq;
-using UnityEditor;
+﻿using UnityEditor;
 using UnityEngine;
 
 [CustomEditor(typeof(NavGrid))]
@@ -25,11 +24,6 @@ public class NavGridEditor : Editor
             Gizmos.DrawCube(t.transform.position + Vector3.up * 0.001f, t.GetComponent<BoxCollider>().size);
             Gizmos.color = new Color(0.5f, 0.5f, 0.5f, 0.5f);
             Gizmos.DrawWireCube(t.transform.position, t.GetComponent<BoxCollider>().size);
-            foreach (NavTile n in t.Edges.Select(e => e.tile).ToList())
-            {
-                Gizmos.color = Color.red;
-                Gizmos.DrawLine(t.transform.position + Vector3.up * 0.002f, n.transform.position + Vector3.up * 0.002f);
-            }
         }
     }
 }

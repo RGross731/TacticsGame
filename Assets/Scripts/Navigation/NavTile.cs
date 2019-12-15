@@ -10,6 +10,16 @@ public class NavTile : MonoBehaviour
     private List<Edge> edges;
     public List<Edge> Edges { get => edges; set => edges = value; }
 
+    private void OnMouseOver()
+    {
+        InputController.HandleTileMouseOver(this);
+    }
+
+    private void OnMouseDown()
+    {
+        InputController.HandleTileMouseDown(this);
+    }
+
     [System.Serializable]
     public class Edge
     {

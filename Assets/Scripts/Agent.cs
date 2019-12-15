@@ -4,37 +4,26 @@ using UnityEngine;
 
 public class Agent : MonoBehaviour
 {
-    private NavTile current;
-
-    private void Awake()
+    public static void SelectAgent(Agent agent)
     {
-        if (Physics.Raycast(transform.position + Vector3.up * 0.001f, Vector3.down, out RaycastHit hitInfo, float.MaxValue, LayerMask.GetMask("NavGrid")))
-        {
-            current = hitInfo.collider.GetComponent<NavTile>();
-        }
+        Debug.Log(agent.name + " selected.");
+        InputController.OnTileMouseDown = agent.SelectMovementDestination;
     }
 
-    private void Update()
+    public void SelectMovementDestination(NavTile goal)
     {
-        if (Input.GetMouseButtonDown(0))
-        {
-            if (Physics.Raycast(Camera.main.ScreenPointToRay(Input.mousePosition), out RaycastHit hitInfo, float.MaxValue, LayerMask.GetMask("NavGrid")))
-            {
-                NavTile goal = hitInfo.collider.GetComponent<NavTile>();
-                List<NavTile> pathTiles = FindObjectOfType<NavGrid>().FindPath(current, goal);
+        Physics.Raycast(transform.position + Vector3.up * 0.001f, Vector3.down, out RaycastHit startHitInfo, float.MaxValue, LayerMask.GetMask("NavGrid"));            
+        NavTile start = startHitInfo.collider.GetComponent<NavTile>();
+        List<NavTile> pathTiles = FindObjectOfType<NavGrid>().FindPath(start, goal);
 
-                if (pathTiles != null && pathTiles[pathTiles.Count - 1] != current)
-                {
-                    StartCoroutine(Animate(pathTiles));
-                }
-            }
+        if (pathTiles != null && pathTiles[pathTiles.Count - 1] != start)
+        {
+            StartCoroutine(Animate(pathTiles));
         }
     }
 
     private IEnumerator Animate(List<NavTile> pathTiles)
     {
-        current = pathTiles[pathTiles.Count - 1];
-
         foreach (NavTile t in pathTiles)
         {
             transform.LookAt(t.transform.position, Vector3.up);
@@ -47,5 +36,15 @@ public class Agent : MonoBehaviour
         }
 
         transform.rotation = Quaternion.LookRotation(Vector3.forward, Vector3.up);
+    }
+
+    private void OnMouseOver()
+    {
+        InputController.HandleAgentMouseOver(this);
+    }
+
+    private void OnMouseDown()
+    {
+        InputController.HandleAgentMouseDown(this);
     }
 }
