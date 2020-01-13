@@ -1,7 +1,7 @@
 ﻿using System;
 using UnityEngine;
 
-public class InputController : MonoBehaviour
+public class PlayerInput : MonoBehaviour
 {
     public static Action<Agent> OnAgentMouseOver;
     public static Action<Agent> OnAgentMouseDown;

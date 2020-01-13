@@ -7,7 +7,7 @@ public class Agent : MonoBehaviour
     public static void SelectAgent(Agent agent)
     {
         Debug.Log(agent.name + " selected.");
-        InputController.OnTileMouseDown = agent.SelectMovementDestination;
+        PlayerInput.OnTileMouseDown = agent.SelectMovementDestination;
     }
 
     public void SelectMovementDestination(NavTile goal)
@@ -40,11 +40,11 @@ public class Agent : MonoBehaviour
 
     private void OnMouseOver()
     {
-        InputController.HandleAgentMouseOver(this);
+        PlayerInput.HandleAgentMouseOver(this);
     }
 
     private void OnMouseDown()
     {
-        InputController.HandleAgentMouseDown(this);
+        PlayerInput.HandleAgentMouseDown(this);
     }
 }

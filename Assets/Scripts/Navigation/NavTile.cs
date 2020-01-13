@@ -12,12 +12,12 @@ public class NavTile : MonoBehaviour
 
     private void OnMouseOver()
     {
-        InputController.HandleTileMouseOver(this);
+        PlayerInput.HandleTileMouseOver(this);
     }
 
     private void OnMouseDown()
     {
-        InputController.HandleTileMouseDown(this);
+        PlayerInput.HandleTileMouseDown(this);
     }
 
     [System.Serializable]
